@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>User Dashboard</h2>
+    <div class="text-muted">
+        Welcome back, {{ current_user.username }}!
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('new_transaction') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Record New Transaction
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Your Recent Transactions</h5>
+            </div>
+            <div class="card-body">
+                {% if current_user.transactions %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Location</th>
+                                <th>Device</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in current_user.transactions|sort(attribute='timestamp', reverse=True)[:5] %}
+                            <tr>
+                                <td>{{ transaction.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ transaction.device.location.name }}</td>
+                                <td>{{ transaction.device.serial_number }}</td>
+                                <td>
+                                    <span class="badge {% if transaction.transaction_type == 'collection' %}bg-success
+                                                      {% elif transaction.transaction_type == 'deposit' %}bg-info
+                                                      {% else %}bg-warning{% endif %}">
+                                        {{ transaction.transaction_type.title() }}
+                                    </span>
+                                </td>
+                                <td>${{ "%.2f"|format(transaction.amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <p class="mb-0">You haven't recorded any transactions yet. Click the "Record New Transaction" button above to get started.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if current_user.transactions %}
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Today's Activity</h5>
+            </div>
+            <div class="card-body">
+                {% set today = namespace(collections=0, deposits=0, free_play=0) %}
+                {% for t in current_user.transactions %}
+                    {% if (now() - t.timestamp).days == 0 %}
+                        {% if t.transaction_type == 'collection' %}
+                            {% set today.collections = today.collections + t.amount %}
+                        {% elif t.transaction_type == 'deposit' %}
+                            {% set today.deposits = today.deposits + t.amount %}
+                        {% elif t.transaction_type == 'free_play' %}
+                            {% set today.free_play = today.free_play + t.amount %}
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Collections
+                        <span class="badge bg-success rounded-pill">${{ "%.2f"|format(today.collections) }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Deposits
+                        <span class="badge bg-info rounded-pill">${{ "%.2f"|format(today.deposits) }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Free Play Credits
+                        <span class="badge bg-warning rounded-pill">${{ "%.2f"|format(today.free_play) }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Net Cash Flow
+                        <span class="badge {% if (today.collections - today.deposits - today.free_play) >= 0 %}bg-success{% else %}bg-danger{% endif %} rounded-pill">
+                            ${{ "%.2f"|format(today.collections - today.deposits - today.free_play) }}
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Transaction Statistics</h5>
+            </div>
+            <div class="card-body">
+                {% set stats = namespace(
+                    collections_total=0, collections_count=0,
+                    deposits_total=0, deposits_count=0,
+                    free_play_total=0, free_play_count=0
+                ) %}
+                
+                {% for t in current_user.transactions %}
+                    {% if t.transaction_type == 'collection' %}
+                        {% set stats.collections_total = stats.collections_total + t.amount %}
+                        {% set stats.collections_count = stats.collections_count + 1 %}
+                    {% elif t.transaction_type == 'deposit' %}
+                        {% set stats.deposits_total = stats.deposits_total + t.amount %}
+                        {% set stats.deposits_count = stats.deposits_count + 1 %}
+                    {% elif t.transaction_type == 'free_play' %}
+                        {% set stats.free_play_total = stats.free_play_total + t.amount %}
+                        {% set stats.free_play_count = stats.free_play_count + 1 %}
+                    {% endif %}
+                {% endfor %}
+                
+                <ul class="list-group">
+                    <li class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-0">Collections</h6>
+                            <small class="text-muted">{{ stats.collections_count }} transactions</small>
+                        </div>
+                        <div class="d-flex w-100 justify-content-between align-items-center mt-2">
+                            <div>Total: <span class="badge bg-success">${{ "%.2f"|format(stats.collections_total) }}</span></div>
+                            <div>Average: <span class="badge bg-info">${{ "%.2f"|format(stats.collections_total / stats.collections_count) if stats.collections_count > 0 else "0.00" }}</span></div>
+                        </div>
+                    </li>
+                    
+                    <li class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-0">Deposits</h6>
+                            <small class="text-muted">{{ stats.deposits_count }} transactions</small>
+                        </div>
+                        <div class="d-flex w-100 justify-content-between align-items-center mt-2">
+                            <div>Total: <span class="badge bg-success">${{ "%.2f"|format(stats.deposits_total) }}</span></div>
+                            <div>Average: <span class="badge bg-info">${{ "%.2f"|format(stats.deposits_total / stats.deposits_count) if stats.deposits_count > 0 else "0.00" }}</span></div>
+                        </div>
+                    </li>
+                    
+                    <li class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-0">Free Play Credits</h6>
+                            <small class="text-muted">{{ stats.free_play_count }} transactions</small>
+                        </div>
+                        <div class="d-flex w-100 justify-content-between align-items-center mt-2">
+                            <div>Total: <span class="badge bg-success">${{ "%.2f"|format(stats.free_play_total) }}</span></div>
+                            <div>Average: <span class="badge bg-info">${{ "%.2f"|format(stats.free_play_total / stats.free_play_count) if stats.free_play_count > 0 else "0.00" }}</span></div>
+                        </div>
+                    </li>
+                    
+                    <li class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-0">Overall Statistics</h6>
+                            <small class="text-muted">{{ current_user.transactions|length }} total transactions</small>
+                        </div>
+                        <div class="d-flex w-100 justify-content-between align-items-center mt-2">
+                            <div>Net Cash Flow: 
+                                <span class="badge {% if (stats.collections_total - stats.deposits_total - stats.free_play_total) >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                    ${{ "%.2f"|format(stats.collections_total - stats.deposits_total - stats.free_play_total) }}
+                                </span>
+                            </div>
+                            <div>Daily Average: 
+                                {% set oldest_transaction = current_user.transactions|sort(attribute='timestamp')|first %}
+                                {% if oldest_transaction %}
+                                    {% set days = ((now() - oldest_transaction.timestamp).days + 1) %}
+                                    <span class="badge bg-info">
+                                        ${{ "%.2f"|format(stats.collections_total / days) }}/day
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">$0.00/day</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

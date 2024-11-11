@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>General Reports</h2>
+    <div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exportModal">
+            <i class="bi bi-download"></i> Export Data
+        </button>
+    </div>
+</div>
+
+<div class="row mt-4">
+    {% for location in locations %}
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">{{ location.name }}</h5>
+            </div>
+            <div class="card-body">
+                <h6 class="mb-3">Weekly Transaction History</h6>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Period</th>
+                                <th>Collections</th>
+                                <th>Deposits</th>
+                                <th>Free Play</th>
+                                <th>Net Cash Flow</th>
+                                <th>Transactions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for week in range(4) %}
+                            {% set stats = namespace(
+                                collections=0,
+                                deposits=0,
+                                free_play=0,
+                                count=0
+                            ) %}
+                            
+                            {% for device in location.devices %}
+                                {% for t in device.transactions %}
+                                    {% set days_ago = (now() - t.timestamp).days %}
+                                    {% if days_ago <= (week + 1) * 7 and days_ago > week * 7 %}
+                                        {% set stats.count = stats.count + 1 %}
+                                        {% if t.transaction_type == 'collection' %}
+                                            {% set stats.collections = stats.collections + t.amount %}
+                                        {% elif t.transaction_type == 'deposit' %}
+                                            {% set stats.deposits = stats.deposits + t.amount %}
+                                        {% elif t.transaction_type == 'free_play' %}
+                                            {% set stats.free_play = stats.free_play + t.amount %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                            
+                            <tr>
+                                <td>Week {{ week + 1 }}</td>
+                                <td>${{ "%.2f"|format(stats.collections) }}</td>
+                                <td>${{ "%.2f"|format(stats.deposits) }}</td>
+                                <td>${{ "%.2f"|format(stats.free_play) }}</td>
+                                <td>
+                                    <span class="badge {% if (stats.collections - stats.deposits - stats.free_play) >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        ${{ "%.2f"|format(stats.collections - stats.deposits - stats.free_play) }}
+                                    </span>
+                                </td>
+                                <td>{{ stats.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <h6 class="mb-3 mt-4">Device Performance</h6>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Serial Number</th>
+                                <th>Type</th>
+                                <th>Last Collection</th>
+                                <th>Last Deposit</th>
+                                <th>Total Collections</th>
+                                <th>Total Deposits</th>
+                                <th>Net Cash Flow</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for device in location.devices %}
+                            {% set stats = namespace(
+                                collections=0,
+                                deposits=0,
+                                free_play=0,
+                                last_collection=none,
+                                last_deposit=none,
+                                last_activity=none
+                            ) %}
+                            
+                            {% for t in device.transactions %}
+                                {% if stats.last_activity is none or t.timestamp > stats.last_activity %}
+                                    {% set stats.last_activity = t.timestamp %}
+                                {% endif %}
+                                
+                                {% if t.transaction_type == 'collection' %}
+                                    {% set stats.collections = stats.collections + t.amount %}
+                                    {% if stats.last_collection is none or t.timestamp > stats.last_collection.timestamp %}
+                                        {% set stats.last_collection = t %}
+                                    {% endif %}
+                                {% elif t.transaction_type == 'deposit' %}
+                                    {% set stats.deposits = stats.deposits + t.amount %}
+                                    {% if stats.last_deposit is none or t.timestamp > stats.last_deposit.timestamp %}
+                                        {% set stats.last_deposit = t %}
+                                    {% endif %}
+                                {% elif t.transaction_type == 'free_play' %}
+                                    {% set stats.free_play = stats.free_play + t.amount %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            <tr>
+                                <td>{{ device.serial_number }}</td>
+                                <td>
+                                    <span class="badge {% if device.device_type == 'slot' %}bg-primary{% else %}bg-info{% endif %}">
+                                        {{ device.device_type.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if stats.last_collection %}
+                                        {{ stats.last_collection.timestamp.strftime('%Y-%m-%d') }}
+                                        (${{ "%.2f"|format(stats.last_collection.amount) }})
+                                    {% else %}
+                                        No collections
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if stats.last_deposit %}
+                                        {{ stats.last_deposit.timestamp.strftime('%Y-%m-%d') }}
+                                        (${{ "%.2f"|format(stats.last_deposit.amount) }})
+                                    {% else %}
+                                        No deposits
+                                    {% endif %}
+                                </td>
+                                <td>${{ "%.2f"|format(stats.collections) }}</td>
+                                <td>${{ "%.2f"|format(stats.deposits) }}</td>
+                                <td>
+                                    <span class="badge {% if (stats.collections - stats.deposits - stats.free_play) >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        ${{ "%.2f"|format(stats.collections - stats.deposits - stats.free_play) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if stats.last_activity and (now() - stats.last_activity).days <= 7 %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% elif stats.last_activity %}
+                                        <span class="badge bg-warning">Inactive</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">No Activity</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Export Transaction Data</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="exportForm" action="{{ url_for('export_transactions') }}" method="GET">
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="location_id" class="form-label">Location (Optional)</label>
+                        <select class="form-select" id="location_id" name="location_id">
+                            <option value="">All Locations</option>
+                            {% for location in locations %}
+                            <option value="{{ location.id }}">{{ location.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Export CSV</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('exportForm').addEventListener('submit', function(e) {
+    const startDate = new Date(document.getElementById('start_date').value);
+    const endDate = new Date(document.getElementById('end_date').value);
+    
+    if (startDate > endDate) {
+        e.preventDefault();
+        alert('Start date must be before end date');
+    }
+});
+
+// Set default date range to last 30 days
+const today = new Date();
+const lastMonth = new Date(today);
+lastMonth.setDate(lastMonth.getDate() - 30);
+
+document.getElementById('start_date').value = lastMonth.toISOString().split('T')[0];
+document.getElementById('end_date').value = today.toISOString().split('T')[0];
+</script>
+{% endblock %}

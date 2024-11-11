@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <div>
+        <h2>Device Performance Report</h2>
+        <p class="text-muted">
+            Last 30 Days: {{ start_date.strftime('%Y-%m-%d') }} to {{ end_date.strftime('%Y-%m-%d') }}
+        </p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Device Rankings by Net Revenue</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Location</th>
+                                <th>Device Type</th>
+                                <th>Serial Number</th>
+                                <th>Collections</th>
+                                <th>Deposits</th>
+                                <th>Free Play</th>
+                                <th>Net Revenue</th>
+                                <th>Transactions</th>
+                                <th>Avg Transaction</th>
+                                <th>Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stats in performance_data %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ stats.location }}</td>
+                                <td>
+                                    <span class="badge {% if stats.device_type == 'slot' %}bg-primary{% else %}bg-info{% endif %}">
+                                        {{ stats.device_type.title() }}
+                                    </span>
+                                </td>
+                                <td>{{ stats.serial_number }}</td>
+                                <td>${{ "%.2f"|format(stats.collections) }}</td>
+                                <td>${{ "%.2f"|format(stats.deposits) }}</td>
+                                <td>${{ "%.2f"|format(stats.free_play) }}</td>
+                                <td class="fw-bold">
+                                    <span class="badge {% if stats.net_revenue >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        ${{ "%.2f"|format(stats.net_revenue) }}
+                                    </span>
+                                </td>
+                                <td>{{ stats.transaction_count }}</td>
+                                <td>${{ "%.2f"|format(stats.avg_transaction) }}</td>
+                                <td>
+                                    {% set daily_revenue = stats.net_revenue / 30 %}
+                                    {% if daily_revenue >= 100 %}
+                                        <span class="badge bg-success">Excellent</span>
+                                    {% elif daily_revenue >= 50 %}
+                                        <span class="badge bg-info">Good</span>
+                                    {% elif daily_revenue >= 0 %}
+                                        <span class="badge bg-warning">Fair</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Poor</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Performance Insights</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Total Active Devices
+                        <span class="badge bg-primary rounded-pill">{{ performance_data|length }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Average Net Revenue per Device
+                        <span class="badge bg-info rounded-pill">
+                            ${{ "%.2f"|format(performance_data|sum(attribute='net_revenue') / performance_data|length if performance_data else 0) }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Highest Net Revenue
+                        <span class="badge bg-success rounded-pill">
+                            ${{ "%.2f"|format(performance_data[0].net_revenue if performance_data else 0) }}
+                        </span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Lowest Net Revenue
+                        <span class="badge bg-warning rounded-pill">
+                            ${{ "%.2f"|format(performance_data[-1].net_revenue if performance_data else 0) }}
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Device Type Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Device Type</th>
+                                <th>Count</th>
+                                <th>Total Revenue</th>
+                                <th>Avg Revenue</th>
+                                <th>Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set device_types = {} %}
+                            {% for stats in performance_data %}
+                                {% if stats.device_type not in device_types %}
+                                    {% set _ = device_types.update({
+                                        stats.device_type: {
+                                            'count': 0,
+                                            'total_revenue': 0
+                                        }
+                                    }) %}
+                                {% endif %}
+                                {% set _ = device_types[stats.device_type].update({
+                                    'count': device_types[stats.device_type].count + 1,
+                                    'total_revenue': device_types[stats.device_type].total_revenue + stats.net_revenue
+                                }) %}
+                            {% endfor %}
+                            
+                            {% for type, data in device_types.items() %}
+                            <tr>
+                                <td>
+                                    <span class="badge {% if type == 'slot' %}bg-primary{% else %}bg-info{% endif %}">
+                                        {{ type.title() }}
+                                    </span>
+                                </td>
+                                <td>{{ data.count }}</td>
+                                <td>${{ "%.2f"|format(data.total_revenue) }}</td>
+                                <td>${{ "%.2f"|format(data.total_revenue / data.count) }}</td>
+                                <td>
+                                    {% set avg_daily = (data.total_revenue / data.count) / 30 %}
+                                    {% if avg_daily >= 100 %}
+                                        <span class="badge bg-success">Excellent</span>
+                                    {% elif avg_daily >= 50 %}
+                                        <span class="badge bg-info">Good</span>
+                                    {% elif avg_daily >= 0 %}
+                                        <span class="badge bg-warning">Fair</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Poor</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

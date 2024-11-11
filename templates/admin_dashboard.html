@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>Admin Dashboard</h2>
+    <div class="text-muted">
+        Welcome back, {{ current_user.username }}!
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-auto">
+                        <a href="{{ url_for('new_transaction') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> New Transaction
+                        </a>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ url_for('manage_users') }}" class="btn btn-info">
+                            <i class="bi bi-people"></i> Manage Users
+                        </a>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ url_for('manage_locations') }}" class="btn btn-success">
+                            <i class="bi bi-geo-alt"></i> Manage Locations
+                        </a>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ url_for('manage_devices') }}" class="btn btn-warning">
+                            <i class="bi bi-hdd"></i> Manage Devices
+                        </a>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                            <i class="bi bi-file-text"></i> View Reports
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Locations Overview</h5>
+            </div>
+            <div class="card-body">
+                {% for location in locations %}
+                <div class="mb-4">
+                    <h6>{{ location.name }}</h6>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Device Type</th>
+                                    <th>Serial Number</th>
+                                    <th>Total Collections</th>
+                                    <th>Total Deposits</th>
+                                    <th>Free Play Credits</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for device in location.devices %}
+                                {% set collections = namespace(total=0) %}
+                                {% set deposits = namespace(total=0) %}
+                                {% set free_play = namespace(total=0) %}
+                                {% set last_transaction = namespace(date=none) %}
+                                
+                                {% for t in device.transactions %}
+                                    {% if t.transaction_type == 'collection' %}
+                                        {% set collections.total = collections.total + t.amount %}
+                                    {% elif t.transaction_type == 'deposit' %}
+                                        {% set deposits.total = deposits.total + t.amount %}
+                                    {% elif t.transaction_type == 'free_play' %}
+                                        {% set free_play.total = free_play.total + t.amount %}
+                                    {% endif %}
+                                    
+                                    {% if last_transaction.date is none or t.timestamp > last_transaction.date %}
+                                        {% set last_transaction.date = t.timestamp %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                <tr>
+                                    <td>{{ device.device_type.title() }}</td>
+                                    <td>{{ device.serial_number }}</td>
+                                    <td>${{ "%.2f"|format(collections.total) }}</td>
+                                    <td>${{ "%.2f"|format(deposits.total) }}</td>
+                                    <td>${{ "%.2f"|format(free_play.total) }}</td>
+                                    <td>
+                                        {% if last_transaction.date and (now() - last_transaction.date).days <= 7 %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% elif last_transaction.date %}
+                                            <span class="badge bg-warning">Inactive</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">No Activity</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

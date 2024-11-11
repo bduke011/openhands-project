@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Record New Transaction</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="transactionForm">
+                    <div class="mb-3">
+                        <label for="device_id" class="form-label">Device</label>
+                        <select class="form-select" id="device_id" name="device_id" required>
+                            <option value="">Select Device</option>
+                            {% for device in devices %}
+                            <option value="{{ device.id }}" data-type="{{ device.device_type }}">
+                                {{ device.location.name }} - {{ device.serial_number }} ({{ device.device_type.title() }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text" id="deviceTypeHelp"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="transaction_type" class="form-label">Transaction Type</label>
+                        <select class="form-select" id="transaction_type" name="transaction_type" required disabled>
+                            <option value="">Select Device First</option>
+                        </select>
+                        <div class="form-text text-muted">
+                            Note: Slot machines can only have collections and free play credits.
+                            Redemption terminals can only receive deposits.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Amount ($)</label>
+                        <input type="number" step="0.01" class="form-control" id="amount" name="amount" required>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Record Transaction</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const deviceSelect = document.getElementById('device_id');
+const transactionSelect = document.getElementById('transaction_type');
+const amountLabel = document.querySelector('label[for="amount"]');
+const deviceTypeHelp = document.getElementById('deviceTypeHelp');
+
+deviceSelect.addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const deviceType = selectedOption.getAttribute('data-type');
+    
+    // Enable transaction type select
+    transactionSelect.disabled = false;
+    
+    // Clear existing options
+    transactionSelect.innerHTML = '<option value="">Select Type</option>';
+    
+    // Update help text
+    if (deviceType === 'slot') {
+        deviceTypeHelp.innerHTML = '<span class="text-primary">Slot Machine: Can only collect money or add free play credits</span>';
+        transactionSelect.innerHTML += `
+            <option value="collection">Collection</option>
+            <option value="free_play">Free Play</option>
+        `;
+    } else if (deviceType === 'redemption') {
+        deviceTypeHelp.innerHTML = '<span class="text-info">Redemption Terminal: Can only receive deposits</span>';
+        transactionSelect.innerHTML += `
+            <option value="deposit">Deposit</option>
+        `;
+    } else {
+        deviceTypeHelp.textContent = '';
+    }
+    
+    // Reset transaction type and amount
+    transactionSelect.value = '';
+    document.getElementById('amount').value = '';
+    amountLabel.textContent = 'Amount ($)';
+});
+
+transactionSelect.addEventListener('change', function() {
+    if (this.value === 'collection') {
+        amountLabel.textContent = 'Collection Amount ($)';
+    } else if (this.value === 'deposit') {
+        amountLabel.textContent = 'Deposit Amount ($)';
+    } else if (this.value === 'free_play') {
+        amountLabel.textContent = 'Free Play Credits ($)';
+    } else {
+        amountLabel.textContent = 'Amount ($)';
+    }
+});
+
+// Form validation
+document.getElementById('transactionForm').addEventListener('submit', function(e) {
+    const deviceType = deviceSelect.options[deviceSelect.selectedIndex].getAttribute('data-type');
+    const transactionType = transactionSelect.value;
+    
+    // Additional validation (although UI prevents these cases)
+    if (deviceType === 'slot' && transactionType === 'deposit') {
+        e.preventDefault();
+        alert('Error: Cannot deposit money into a slot machine');
+    } else if (deviceType === 'redemption' && (transactionType === 'collection' || transactionType === 'free_play')) {
+        e.preventDefault();
+        alert('Error: Redemption terminals can only receive deposits');
+    }
+});
+</script>
+{% endblock %}

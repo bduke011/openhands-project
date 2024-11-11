@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>Location Management</h2>
+    <div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newLocationModal">
+            <i class="bi bi-plus-circle"></i> Add New Location
+        </button>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Existing Locations</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Devices</th>
+                                <th>Total Collections</th>
+                                <th>Total Deposits</th>
+                                <th>Net Cash Flow</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for location in locations %}
+                            {% set stats = namespace(collections=0, deposits=0, free_play=0) %}
+                            {% for device in location.devices %}
+                                {% for t in device.transactions %}
+                                    {% if t.transaction_type == 'collection' %}
+                                        {% set stats.collections = stats.collections + t.amount %}
+                                    {% elif t.transaction_type == 'deposit' %}
+                                        {% set stats.deposits = stats.deposits + t.amount %}
+                                    {% elif t.transaction_type == 'free_play' %}
+                                        {% set stats.free_play = stats.free_play + t.amount %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                            
+                            <tr>
+                                <td>{{ location.name }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ location.devices|length }}</span>
+                                </td>
+                                <td>${{ "%.2f"|format(stats.collections) }}</td>
+                                <td>${{ "%.2f"|format(stats.deposits) }}</td>
+                                <td>
+                                    <span class="badge {% if (stats.collections - stats.deposits - stats.free_play) >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        ${{ "%.2f"|format(stats.collections - stats.deposits - stats.free_play) }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm delete-location" data-location-id="{{ location.id }}"
+                                            {% if location.devices %}disabled title="Remove all devices first"{% endif %}>
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Location Modal -->
+<div class="modal fade" id="newLocationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Location</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newLocationForm">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Location Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Location</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('newLocationForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    try {
+        const response = await fetch('/admin/locations/new', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    } catch (error) {
+        alert('Error creating location');
+    }
+});
+
+document.querySelectorAll('.delete-location').forEach(button => {
+    button.addEventListener('click', async () => {
+        if (button.disabled) return;
+        
+        if (!confirm('Are you sure you want to delete this location? This action cannot be undone.')) return;
+        
+        const locationId = button.dataset.locationId;
+        try {
+            const response = await fetch(`/admin/locations/${locationId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert(data.error);
+            }
+        } catch (error) {
+            alert('Error deleting location');
+        }
+    });
+});
+</script>
+{% endblock %}

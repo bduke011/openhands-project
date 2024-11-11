@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <div>
+        <h2>{{ game_type.name }} Performance</h2>
+        <p class="text-muted">
+            Period: {{ start_date.strftime('%Y-%m-%d') }} to {{ end_date.strftime('%Y-%m-%d') }}
+        </p>
+    </div>
+    <div class="btn-group">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#dateRangeModal">
+            <i class="bi bi-calendar-range"></i> Change Date Range
+        </button>
+        <a href="{{ url_for('export_game_type_performance', game_type_id=game_type.id, 
+                           start_date=start_date.strftime('%Y-%m-%d'), 
+                           end_date=end_date.strftime('%Y-%m-%d')) }}" 
+           class="btn btn-success">
+            <i class="bi bi-download"></i> Export Data
+        </a>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Overall Performance</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <th>Total Collections</th>
+                                <td>${{ "%.2f"|format(performance.total_collections) }}</td>
+                            </tr>
+                            <tr>
+                                <th>Total Free Play</th>
+                                <td>${{ "%.2f"|format(performance.total_free_play) }}</td>
+                            </tr>
+                            <tr class="table-info">
+                                <th>Net Profit</th>
+                                <td>
+                                    <span class="badge {% if performance.total_net_profit >= 0 %}bg-success{% else %}bg-danger{% endif %} fs-5">
+                                        ${{ "%.2f"|format(performance.total_net_profit) }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Daily Average</th>
+                                <td>${{ "%.2f"|format(performance.daily_average) }}/day</td>
+                            </tr>
+                            <tr>
+                                <th>Average per Device</th>
+                                <td>${{ "%.2f"|format(performance.per_device_average) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Activity Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <th>Total Devices</th>
+                                <td>{{ performance.total_devices }}</td>
+                            </tr>
+                            <tr>
+                                <th>Total Transactions</th>
+                                <td>{{ performance.total_transactions }}</td>
+                            </tr>
+                            <tr>
+                                <th>Days Analyzed</th>
+                                <td>{{ performance.days_analyzed }}</td>
+                            </tr>
+                            <tr>
+                                <th>Transactions per Day</th>
+                                <td>{{ "%.1f"|format(performance.total_transactions / performance.days_analyzed) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Performance by Location</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Location</th>
+                                <th>Devices</th>
+                                <th>Collections</th>
+                                <th>Free Play</th>
+                                <th>Net Profit</th>
+                                <th>Daily Average</th>
+                                <th>Per Device</th>
+                                <th>Utilization</th>
+                                <th>Performance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for location, stats in performance.locations.items() %}
+                            <tr>
+                                <td>{{ location }}</td>
+                                <td>{{ stats.device_count }}</td>
+                                <td>${{ "%.2f"|format(stats.collections) }}</td>
+                                <td>${{ "%.2f"|format(stats.free_play) }}</td>
+                                <td>
+                                    <span class="badge {% if stats.net_profit >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        ${{ "%.2f"|format(stats.net_profit) }}
+                                    </span>
+                                </td>
+                                <td>${{ "%.2f"|format(stats.daily_average) }}/day</td>
+                                <td>${{ "%.2f"|format(stats.per_device_average) }}</td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar {% if stats.utilization_rate >= 80 %}bg-success
+                                                               {% elif stats.utilization_rate >= 50 %}bg-info
+                                                               {% elif stats.utilization_rate >= 30 %}bg-warning
+                                                               {% else %}bg-danger{% endif %}"
+                                             role="progressbar"
+                                             style="width: {{ stats.utilization_rate }}%"
+                                             aria-valuenow="{{ stats.utilization_rate }}"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100">
+                                            {{ "%.1f"|format(stats.utilization_rate) }}%
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% set daily_profit = stats.net_profit / performance.days_analyzed %}
+                                    {% if daily_profit >= 100 %}
+                                        <span class="badge bg-success">Excellent</span>
+                                    {% elif daily_profit >= 50 %}
+                                        <span class="badge bg-info">Good</span>
+                                    {% elif daily_profit >= 0 %}
+                                        <span class="badge bg-warning">Fair</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Poor</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Date Range Modal -->
+<div class="modal fade" id="dateRangeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Date Range</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="dateRangeForm">
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" 
+                               value="{{ start_date.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" 
+                               value="{{ end_date.strftime('%Y-%m-%d') }}" required>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-outline-secondary" onclick="setLastDays(7)">Last 7 Days</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="setLastDays(30)">Last 30 Days</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="setLastDays(90)">Last 90 Days</button>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Apply</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('dateRangeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const startDate = document.getElementById('start_date').value;
+    const endDate = document.getElementById('end_date').value;
+    
+    if (new Date(startDate) > new Date(endDate)) {
+        alert('Start date must be before end date');
+        return;
+    }
+    
+    window.location.href = `{{ url_for('game_type_performance', game_type_id=game_type.id) }}?start_date=${startDate}&end_date=${endDate}`;
+});
+
+function setLastDays(days) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days);
+    
+    document.getElementById('start_date').value = start.toISOString().split('T')[0];
+    document.getElementById('end_date').value = end.toISOString().split('T')[0];
+}
+</script>
+{% endblock %}

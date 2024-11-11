@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+    <h2>Game Type Management</h2>
+    <div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newGameTypeModal">
+            <i class="bi bi-plus-circle"></i> Add New Game Type
+        </button>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Game Types</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Code</th>
+                                <th>Description</th>
+                                <th>Devices</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for game_type in game_types %}
+                            <tr>
+                                <td>{{ game_type.name }}</td>
+                                <td><code>{{ game_type.code }}</code></td>
+                                <td>{{ game_type.description or 'No description' }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ game_type.devices|length }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge {% if game_type.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ 'Active' if game_type.is_active else 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td>{{ game_type.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('game_type_performance', game_type_id=game_type.id) }}" 
+                                           class="btn btn-sm btn-info">
+                                            <i class="bi bi-graph-up"></i> Performance
+                                        </a>
+                                        <button class="btn btn-sm btn-primary edit-game-type" 
+                                                data-game-type-id="{{ game_type.id }}"
+                                                data-name="{{ game_type.name }}"
+                                                data-description="{{ game_type.description or '' }}"
+                                                data-is-active="{{ game_type.is_active|lower }}">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </button>
+                                        <button class="btn btn-sm {% if game_type.is_active %}btn-warning{% else %}btn-success{% endif %} toggle-status"
+                                                data-game-type-id="{{ game_type.id }}"
+                                                data-current-status="{{ game_type.is_active|lower }}">
+                                            <i class="bi bi-toggle-{% if game_type.is_active %}on{% else %}off{% endif %}"></i>
+                                            {{ 'Deactivate' if game_type.is_active else 'Activate' }}
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Game Type Modal -->
+<div class="modal fade" id="newGameTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Game Type</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newGameTypeForm">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                        <div class="form-text">Display name for the game type (e.g., "Texas Skill 1")</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="code" class="form-label">Code</label>
+                        <input type="text" class="form-control" id="code" name="code" required pattern="[a-z0-9_]+">
+                        <div class="form-text">Unique identifier (e.g., "texas_skill_1"). Use lowercase letters, numbers, and underscores only.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Create Game Type</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Game Type Modal -->
+<div class="modal fade" id="editGameTypeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Game Type</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editGameTypeForm">
+                    <input type="hidden" id="edit_game_type_id">
+                    <div class="mb-3">
+                        <label for="edit_name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="edit_name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_description" class="form-label">Description</label>
+                        <textarea class="form-control" id="edit_description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Game Type</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Create new game type
+document.getElementById('newGameTypeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    try {
+        const response = await fetch('/admin/game-types/new', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    } catch (error) {
+        alert('Error creating game type');
+    }
+});
+
+// Edit game type
+document.querySelectorAll('.edit-game-type').forEach(button => {
+    button.addEventListener('click', () => {
+        const modal = new bootstrap.Modal(document.getElementById('editGameTypeModal'));
+        document.getElementById('edit_game_type_id').value = button.dataset.gameTypeId;
+        document.getElementById('edit_name').value = button.dataset.name;
+        document.getElementById('edit_description').value = button.dataset.description;
+        modal.show();
+    });
+});
+
+document.getElementById('editGameTypeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const gameTypeId = document.getElementById('edit_game_type_id').value;
+    const formData = {
+        name: document.getElementById('edit_name').value,
+        description: document.getElementById('edit_description').value
+    };
+    
+    try {
+        const response = await fetch(`/admin/game-types/${gameTypeId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert(data.error);
+        }
+    } catch (error) {
+        alert('Error updating game type');
+    }
+});
+
+// Toggle game type status
+document.querySelectorAll('.toggle-status').forEach(button => {
+    button.addEventListener('click', async () => {
+        const gameTypeId = button.dataset.gameTypeId;
+        const currentStatus = button.dataset.currentStatus === 'true';
+        const newStatus = !currentStatus;
+        
+        if (!confirm(`Are you sure you want to ${newStatus ? 'activate' : 'deactivate'} this game type?`)) return;
+        
+        try {
+            const response = await fetch(`/admin/game-types/${gameTypeId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    is_active: newStatus
+                })
+            });
+            
+            const data = await response.json();
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert(data.error);
+            }
+        } catch (error) {
+            alert('Error updating game type status');
+        }
+    });
+});
+
+// Format code field to match pattern
+document.getElementById('code').addEventListener('input', function() {
+    this.value = this.value.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+});
+</script>
+{% endblock %}
